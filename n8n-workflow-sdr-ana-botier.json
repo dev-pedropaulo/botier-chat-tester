@@ -1,0 +1,317 @@
+{
+  "name": "[TESTE-SDR-ANA-SERENA-ECO-130T_BOTIER]",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "chat-trigger-01",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -300,
+        200
+      ],
+      "webhookId": "test-sdr-ana-chat"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "test-sdr-ana",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-01",
+      "name": "Webhook Teste Automatizado",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        420
+      ],
+      "webhookId": "test-sdr-ana-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// Se veio pelo Chat Trigger nativo do n8n\nif (input.chatInput !== undefined) {\n  return [{\n    json: {\n      message: (input.chatInput || '').trim(),\n      phone: '5531999998888',\n      pushName: 'Carlos Teste',\n      origem_lead: 'anuncio_serena_eco', // Opções: 'anuncio_serena_eco', 'anuncio_serena_130t', 'inbound_organico'\n      produto_lead: 'Serena ECO',\n      sessionId: input.sessionId || 'sessao_chat_ui_01',\n      dados_iniciais: {}\n    }\n  }];\n}\n\n// Se veio pelo Webhook de teste automatizado (POST com JSON)\nconst body = input.body || input;\nreturn [{\n  json: {\n    message: (body.message || body.chatInput || '').trim(),\n    phone: body.phone || '5531999998888',\n    pushName: body.pushName || 'Carlos Teste',\n    origem_lead: body.origem_lead || body.origem || 'anuncio_serena_eco',\n    produto_lead: body.produto_lead || body.produto || 'Serena ECO',\n    sessionId: body.sessionId || body.phone || 'sessao_webhook_01',\n    dados_iniciais: body.dados_iniciais || {}\n  }\n}];"
+      },
+      "id": "norm-01",
+      "name": "Normalizar Entrada Teste",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\n\nconst leadNome = ctx.pushName || 'Produtor';\nconst primeiroNome = leadNome.split(' ')[0] || '';\n\n// Identifica o foco do produto com base no anúncio ou na mensagem\nconst textoCompleto = [ctx.origem_lead, ctx.produto_lead, ctx.message].join(' ').toLowerCase();\nlet produtoFoco = 'Indefinido';\n\nif (/eco\\b|econ[oô]mica/.test(textoCompleto)) {\n  produtoFoco = 'Serena ECO';\n} else if (/130\\s?t|cracker/.test(textoCompleto)) {\n  produtoFoco = 'Serena 130T';\n}\n\nconst dadosQual = Object.assign({\n  area_atuacao: null,\n  cidade: null,\n  estado: null,\n  intencao_compra: null,\n  rebanho: null,\n  vacas_lactacao: null,\n  producao_diaria_litros: null,\n  preco_litro: null,\n  situacao_silagem: null,\n  processamento_grao: null\n}, ctx.dados_iniciais || {});\n\nconst dadosColetados = Object.entries(dadosQual)\n  .filter(([_, v]) => v !== null && v !== undefined && v !== '')\n  .map(([k, v]) => `${k}: ${v}`)\n  .join(', ') || 'nenhum dado coletado ainda';\n\nconst contexto_sistema = `[CONTEXTO DO LEAD NESTE ATENDIMENTO]\n- Nome do Lead: ${primeiroNome} (${leadNome})\n- Telefone / WhatsApp: ${ctx.phone}\n- Origem / Campanha: ${ctx.origem_lead || 'Contato direto'}\n- Produto de Foco Inicial: ${produtoFoco}\n- Dados já conhecidos no sistema: ${dadosColetados}\n- Sessão de Atendimento: ${ctx.sessionId}\n(Use este contexto para não repetir perguntas de dados que já foram respondidos!)`;\n\nreturn [{\n  json: Object.assign({}, ctx, {\n    lead_first_name: primeiroNome,\n    produto_foco: produtoFoco,\n    dados_qualificacao: dadosQual,\n    contexto_sistema: contexto_sistema\n  })\n}];"
+      },
+      "id": "prep-ctx-01",
+      "name": "Preparar Contexto Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "options": {
+          "systemMessage": "# IDENTIDADE E POSICIONAMENTO\nVocê é **Ana**, Técnica Parceira da Botier (https://botier.com.br).\nVocê NÃO é uma vendedora convencional agressiva. Você é uma especialista técnica e consultiva de campo. Seu papel é orientar o produtor com base na realidade da fazenda dele, explicar as diferenças técnicas, ancorar o valor das máquinas e, após a qualificação, conectá-lo com o especialista técnico comercial da Botier (**Diego**) e convidá-lo para o Grupo de Lançamento da Serena ECO.\n\n---\n\n# CONTEXTO DINÂMICO DESTE ATENDIMENTO (OBRIGATÓRIO LER)\n{{ $json.contexto_sistema }}\n\n---\n\n# OS DOIS MODELOS DE ENSILADEIRA DA BOTIER\n\n### 1. SERENA 130T (A Máquina Completa de Alta Precisão)\n- **Perfil:** Médios e grandes produtores de leite (especialmente acima de 2.000 L/dia) e prestadores de serviço de silagem.\n- **Grande Diferencial:** **Cracker** de duplo rolo a ~4.000 RPM (diferencial de cisalhamento de 13,5%). Rasga o grão de milho, expõe 100% do amido e entrega KPS de autopropelida. Ganho comprovado de 2 a 3 litros de leite/vaca/dia e elimina grãos inteiros nas fezes.\n- **Potência:** Mínimo absoluto de 75 hp na TDP (recomendado trator a partir de 110 cv no motor).\n- **Transmissão:** Correias com tensionador automático por mola.\n- **Preço de Tabela:**\n  - Serena 130T com cracker: R$ 240.000\n  - Serena 130T sem cracker: R$ 180.000\n\n### 2. SERENA ECO (A Versão Econômica e Acessível)\n- **Perfil:** Pequenos e médios produtores (de 15 a mais de 100 vacas, sem exigência de produção mínima de 2.000 L/dia) ou produtores com tratores a partir de 75 cv no motor.\n- **Conceito:** A mesma robustez e estrutura da Serena, porém em uma versão econômica e acessível para quem não precisa do cracker.\n- **O que ela NÃO tem:** Apenas o Cracker. Todo o restante é idêntico à Serena 130T.\n- **Diferença Mecânica:** Transmissão por cardã e caixa de engrenagens (para redução de custo mantendo máxima durabilidade).\n- **Potência:** Opera com folga a partir de **75 cv no motor** (muito mais leve e acessível!).\n- **Condições Especiais:** Lançamento exclusivo com lote inicial de condições especiais. As reservas e valor promocional são liberados no **Grupo Exclusivo de Lançamento da Serena ECO** com o Diego.\n\n### BENEFÍCIOS EXCLUSIVOS PRESENTES EM AMBOS OS MODELOS:\n1. **Afiador de facas automático acionado da cabine:** Afiação perfeita e autorretificação do rebolo em minutos sem sair do trator e sem risco.\n2. **Ajuste externo da contrafaca com chave 19mm:** Regulagem em 3 a 5 minutos pela lateral, sem desmontar carenagens.\n3. **Embreagem catraca limitadora de torque:** Substitui o pino fusível. Desarma e rearma sozinha em sobrecargas, sem parar o serviço na roça.\n4. **Plataforma de 1,20m área total:** Colhe até 3 linhas de 45cm ou 2 linhas largas sem embuchar, com raspadores de giro livre.\n5. **Bica de polímero com giro hidráulico 130°:** Resistente, leve e de fácil manutenção.\n\n---\n\n# REGRAS DE ROTEAMENTO DO ATENDIMENTO\n\n1. **Lead veio focado na SERENA ECO (`Produto de Foco: Serena ECO`):**\n   - Fale diretamente da Serena ECO. Destaque a economia, trator de 75cv e os benefícios de afiação e robustez. Não confunda o lead falando de cracker ou 130T a menos que ele pergunte especificamente sobre quebra de grãos.\n   - Aplique a **Qualificação Enxuta da ECO**.\n2. **Lead veio focado na SERENA 130T (`Produto de Foco: Serena 130T`):**\n   - Fale da Serena 130T e dos ganhos do cracker no leite. Se o lead disser que R$ 180k/240k está fora do orçamento, **faça a transição imediata para a Serena ECO** como a solução perfeita.\n   - Aplique a **Qualificação Completa da 130T**.\n3. **Lead com foco Indefinido (Inbound Geral / Base Antiga):**\n   - Apresente brevemente as duas alternativas e deixe o produtor escolher:\n     *\"Aqui na Botier nós temos duas opções: a Serena 130T completa com cracker (padrão de autopropelida para máxima extração de amido) e a Serena ECO (nossa versão econômica para tratores a partir de 75cv, com a mesma robustez e afiação automática, sem o cracker). Me conta: qual o perfil da sua fazenda?\"*\n\n---\n\n# REGRA DE OURO DO PREÇO (MANDATÓRIO: 4 BENEFÍCIOS ANTES DO PREÇO)\nSe o lead perguntar *\"Quanto custa?\", \"Qual o preço?\", \"Qual o valor?\"*:\n- **NUNCA solte o preço seco logo de início.**\n- Apresente antes **pelo menos 4 benefícios concretos** da máquina (afiação automática da cabine, contrafaca externa chave 19, catraca sem pino fusível, plataforma de 1,20m sem linha, cracker no caso da 130T).\n- Ancore que o valor depende do modelo ideal para o trator e a fazenda dele, pergunte a atividade e a potência do trator.\n- Se o produtor insistir ou já tiver ouvido os benefícios, aí sim apresente os valores com clareza e sem rodeios.\n\n---\n\n# QUALIFICAÇÃO DO LEAD\n\n### Se for SERENA ECO (Qualificação Enxuta - apenas 3 perguntas):\n1. `area_atuacao`: Produtor de leite ou corte?\n2. `cidade` e `estado`: Qual sua cidade e estado? (Foco principal: MG e SP).\n3. `intencao_compra`: Momento de compra (aquisição imediata nesta safra, próxima safra ou curioso/avaliando?).\n\n### Se for SERENA 130T (Qualificação Completa):\n1. `area_atuacao` (leite, corte ou prestador)\n2. `rebanho` (total cabeças) e `vacas_lactacao` (se leite)\n3. `producao_diaria_litros` (se leite)\n4. `situacao_silagem` (própria ou terceirizada)\n5. `processamento_grao` (já processa grão ou só pica?)\n6. `cidade` e `estado`\n7. `intencao_compra` (60dias, 120dias, curiosidade)\n\n---\n\n# ETAPA DE HANDOFF (DIRECIONAMENTO COMERCIAL)\nQuando as informações necessárias forem respondidas e o lead demonstrar interesse real:\n- Encaminhe para o especialista técnico comercial da região: **Diego**.\n- Para a **Serena ECO**, convide o produtor para o **Grupo Exclusivo de Lançamento da Serena ECO**, explicando que é onde são liberadas as 30 máquinas com condições e preço especial de lançamento.\n- Pergunte se pode passar o contato para o Diego ligar/chamar.\n- Somente marque `acionar_especialista: true` quando o produtor aceitar/confirmar.\n\n---\n\n# REGRAS DE ESTILO E FORMATAÇÃO\n- Respostas curtas, objetivas e fáceis de ler no WhatsApp (máximo 3 a 4 linhas por mensagem).\n- Sem termos em inglês ou jargões de CRM (nunca diga lead, scoring, funil, MQL, temperatura).\n- Tom respeitoso, técnico e acolhedor de quem conhece o campo.\n- Ao citar potência de trator, declare explicitamente: \"75 cv no motor\" ou \"75 hp na TDP\".\n- Retorne SEMPRE exclusivamente no formato JSON abaixo.\n\n---\n\n# FORMATO DE SAÍDA OBRIGATÓRIO (JSON PURO)\n```json\n{\n  \"mensagem_whatsapp\": \"Texto da resposta da Ana para o WhatsApp\",\n  \"novos_dados\": {\n    \"area_atuacao\": \"leite\",\n    \"cidade\": \"Passos\",\n    \"estado\": \"MG\",\n    \"intencao_compra\": \"60dias\",\n    \"produto_interesse\": \"Serena ECO\"\n  },\n  \"acionar_especialista\": false,\n  \"enviar_video_geral\": false\n}\n```"
+        }
+      },
+      "id": "agent-01",
+      "name": "AI Agent - Ana Botier",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "llm-01",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        500,
+        500
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "O15aNB3icNpWMpEK",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionKey": "={{ $('Preparar Contexto Lead').item.json.sessionId }}",
+        "contextWindowLength": 20
+      },
+      "id": "mem-01",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        640,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "buscar_info_produto",
+        "description": "Retorna especificações técnicas, dados comparativos, potência e detalhes da Serena 130T e da Serena ECO. Chame sempre que o lead fizer perguntas técnicas ou quiser saber diferenças entre os modelos.",
+        "jsCode": "const result = {\n  fabricante: \"Botier (https://botier.com.br)\",\n  produtos: {\n    serena_130t: {\n      nome: \"SERENA 130T\",\n      categoria: \"Completa com Qualidade de Autopropelida\",\n      preco: {\n        com_cracker: \"R$ 240.000\",\n        sem_cracker: \"R$ 180.000\",\n        observacao: \"Condições e financiamento sob consulta com especialista Diego\"\n      },\n      potencia: {\n        minimo_tdp_hp: 75,\n        recomendado_motor_cv: 110,\n        explicacao: \"75 hp na TDP é o mínimo absoluto. Recomenda-se trator de 110 cv no motor para folga e lavoura pesada.\"\n      },\n      diferencial_principal: \"Cracker de duplo rolo a 4.000 RPM (13,5% de cisalhamento). Entrega KPS alto, expõe 100% do amido, gera 2 a 3 L a mais de leite/vaca/dia e elimina grãos inteiros no esterco.\",\n      transmissao: \"Correias e polias com tensionador automático por mola.\",\n      culturas: \"Milho, sorgo, grãos e capim Capiaçu exclusivo.\",\n      beneficios_comuns: [\n        \"Afiação automática de facas direto da cabine via hidráulico\",\n        \"Ajuste da contrafaca externo com chave 19mm em 3 a 5 min\",\n        \"Embreagem catraca limitadora de torque (sem pino fusível)\",\n        \"Plataforma de 1,20m área total sem linha fixa (até 3 linhas de 45cm ou 2 linhas largas)\",\n        \"Bica de polímero com giro hidráulico de 130°\"\n      ]\n    },\n    serena_eco: {\n      nome: \"SERENA ECO\",\n      categoria: \"Versão Econômica e Acessível\",\n      condicao_comercial: \"Lançamento em lote inicial com valor e condições especiais no Grupo Exclusivo de Lançamento com o especialista Diego.\",\n      potencia: {\n        recomendado_motor_cv: 75,\n        explicacao: \"Opera perfeitamente em tratores a partir de 75 cv no motor. Muito mais leve e não exige trator pesado.\"\n      },\n      diferencial_principal: \"Mesma robustez, mesmo chassi e mesmos benefícios operacionais da Serena, porém SEM CRACKER e com transmissão por cardã/caixa para redução de custo.\",\n      transmissao: \"Cardã e caixa de engrenagens reforçada.\",\n      beneficios_mantidos: [\n        \"Afiação automática de facas direto da cabine via hidráulico\",\n        \"Ajuste da contrafaca externo com chave 19mm em 3 a 5 min\",\n        \"Embreagem catraca limitadora de torque (sem pino fusível)\",\n        \"Plataforma de 1,20m área total sem linha fixa (até 3 linhas de 45cm ou 2 linhas largas)\",\n        \"Bica de polímero com giro hidráulico de 130°\"\n      ],\n      publico_alvo: \"Pequeno e médio produtor de leite ou corte (de 15 a 100+ vacas) com trator a partir de 75 cv que quer uma ensiladeira moderna sem custo excessivo.\"\n    }\n  }\n};\nreturn JSON.stringify(result);"
+      },
+      "id": "tool-prod-01",
+      "name": "buscar_info_produto",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "tratar_objecao",
+        "description": "Retorna respostas recomendadas para objeções de preço, dúvidas de potência, comparação entre Serena ECO e 130T, concorrência e condições de pagamento.",
+        "jsCode": "const result = {\n  objecoes: [\n    {\n      objecao: \"Quanto custa? / Qual o preço? / Qual o valor?\",\n      regra_obrigatoria: \"Apresente pelo menos 4 benefícios da máquina ANTES de soltar o preço.\",\n      argumentacao: \"Apresente afiação da cabine, ajuste da contrafaca chave 19, catraca sem pino fusível e plataforma de 1,20m contínua. Em seguida, diferencie a Serena 130T (R$ 180k a R$ 240k) da Serena ECO (condições especiais no grupo de lançamento) e pergunte a potência do trator e a atividade dele.\"\n    },\n    {\n      objecao: \"Tá caro / É muito dinheiro / Achei o valor alto\",\n      resposta_eco: \"Para quem quer a mesma robustez da Serena mas tem uma operação menor ou trator mais modesto, criamos a Serena ECO. Ela mantém a afiação de cabine, a contrafaca externa e a catraca sem pino fusível, mas opera em trator de 75cv e tem valor de lançamento muito mais acessível.\",\n      resposta_130t: \"Na 130T com cracker, o grão não passa inteiro no esterco. Nossos clientes relatam ganho de 2 a 3 litros de leite por vaca ao dia com a mesma comida, o que paga o investimento da máquina na primeira safra.\"\n    },\n    {\n      objecao: \"Qual a diferença entre a Serena ECO e a Serena 130T?\",\n      resposta: \"A Serena ECO foi criada para ser acessível a tratores a partir de 75 cv no motor. Ela mantém os maiores benefícios da Botier: afiação da cabine, contrafaca externa em 3 min, catraca sem pino fusível e plataforma de 1,20m. A diferença é que a ECO não tem o cracker de grãos e usa transmissão por cardã/caixa para baratear o custo. Já a 130T tem cracker de autopropelida e exige trator mais forte.\"\n    },\n    {\n      objecao: \"Meu trator tem 75 cv, aguenta?\",\n      resposta: \"Se for a Serena ECO, aguenta com certeza! A ECO foi projetada exatamente para operar com tratores a partir de 75 cv no motor. Se fosse a 130T, o mínimo técnico seria 75 hp na TDP (que exige um trator de ~90 a 110 cv no motor).\"\n    },\n    {\n      objecao: \"Já tenho máquina convencional / Já funciona\",\n      resposta: \"Você já conferiu se há grãos inteiros saindo no esterco das vacas após a ordenha? Em máquinas convencionais, boa parte do amido vai embora no cocho sem digerir. Além disso, quanto tempo você gasta para afiar facas ou trocando pino fusível quebrado no sol? Na Serena a afiação é feita da cabine em minutos e não existe pino fusível.\"\n    },\n    {\n      objecao: \"E se quebrar? Tem peça de reposição?\",\n      resposta: \"A Botier projetou as máquinas usando componentes padronizados de mercado (rolamentos, correias e cilindros hidráulicos que você acha em qualquer distribuidor de autopeças ou maquinário da sua região, sem depender de autorizada exclusiva).\"\n    }\n  ]\n};\nreturn JSON.stringify(result);"
+      },
+      "id": "tool-obj-01",
+      "name": "tratar_objecao",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const agentResp = $input.first().json;\nconst ctx = $('Preparar Contexto Lead').first().json;\n\nconst rawText = agentResp.output || '{}';\nconst cleaned = rawText\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/i, '')\n  .replace(/\\s*```$/i, '')\n  .trim();\n\nlet parsed = {};\ntry {\n  parsed = JSON.parse(cleaned);\n} catch(e) {\n  parsed = { mensagem_whatsapp: cleaned, novos_dados: {}, acionar_especialista: false };\n}\n\nconst mensagem = parsed.mensagem_whatsapp || cleaned;\nconst novos_dados = parsed.novos_dados || {};\nconst acionar_especialista = parsed.acionar_especialista === true;\nconst enviar_video = parsed.enviar_video_geral === true;\n\nconst dados_qual = Object.assign({}, ctx.dados_qualificacao, novos_dados);\n\n// Determina se o foco final é Serena ECO ou 130T\nlet produtoFoco = ctx.produto_foco;\nif (novos_dados.produto_interesse) {\n  produtoFoco = novos_dados.produto_interesse;\n}\n\n// ── Scoring Específico ──────────────────────────────────────────────────\nlet score = 0;\nconst area = (dados_qual.area_atuacao || '').toLowerCase();\nconst estado = (dados_qual.estado || '').toUpperCase();\nconst intencao = (dados_qual.intencao_compra || '').toLowerCase();\n\n// Região prioritária definida na reunião (MG e SP)\nif (estado === 'MG' || estado === 'SP') {\n  score += 25;\n} else if (estado) {\n  score += 10;\n}\n\nif (produtoFoco === 'Serena ECO') {\n  // Lógica de Scoring Serena ECO (Mais enxuta e inclusiva)\n  if (area.includes('leite') || area.includes('corte')) score += 30;\n  \n  if (intencao === 'imediata' || intencao === '60dias') score += 40;\n  else if (intencao === 'safra' || intencao === '120dias') score += 25;\n  else if (intencao === 'curiosidade') score += 5;\n  \n} else {\n  // Lógica de Scoring Serena 130T (Foco em leite e volume)\n  if (area.includes('leite')) score += 30;\n  else if (area.includes('corte') || area.includes('misto')) score += 15;\n  else if (area.includes('prestador')) score += 20;\n\n  const rebanho = Number(dados_qual.rebanho) || 0;\n  if (rebanho > 100) score += 35;\n  else if (rebanho >= 50) score += 20;\n  else if (rebanho > 0) score += 5;\n\n  if (intencao === '60dias') score += 30;\n  else if (intencao === '120dias') score += 15;\n}\n\n// ── Temperatura ──────────────────────────────────────────────────────────\nlet temperatura = 'FRIO';\nif (score >= 80) temperatura = 'QUENTE';\nelse if (score >= 50) temperatura = 'MORNO';\nelse if (score >= 20) temperatura = 'FRIO';\nelse temperatura = 'DESCARTADO';\n\n// ── Validação de Dados Completos ──────────────────────────────────────────\nlet dados_completos = false;\nif (produtoFoco === 'Serena ECO') {\n  // ECO só exige atividade, cidade, estado e momento de compra\n  dados_completos = Boolean(dados_qual.area_atuacao && dados_qual.cidade && dados_qual.estado && dados_qual.intencao_compra);\n} else {\n  // 130T exige perfil mais completo\n  const camposObrig130T = ['area_atuacao', 'rebanho', 'cidade', 'estado', 'intencao_compra'];\n  dados_completos = camposObrig130T.every(c => Boolean(dados_qual[c]));\n}\n\nreturn [{\n  json: Object.assign({}, ctx, {\n    mensagem_whatsapp: mensagem,\n    novos_dados: novos_dados,\n    dados_qualificacao: dados_qual,\n    produto_foco: produtoFoco,\n    pontuacao: score,\n    temperatura: temperatura,\n    dados_completos: dados_completos,\n    acionar_especialista: acionar_especialista,\n    enviar_video: enviar_video\n  })\n}];"
+      },
+      "id": "score-01",
+      "name": "Parsear Resposta e Calcular Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\n\n// Formata substituição de [nome]\nconst primeiroNome = ctx.lead_first_name || '';\nlet msgFormatada = (ctx.mensagem_whatsapp || '')\n  .replace(/\\[nome\\]/gi, primeiroNome)\n  .replace(/\\{nome\\}/gi, primeiroNome)\n  .replace(/\\s*!\\s*/g, '! ')\n  .trim();\n\n// Bloco visual de debug para facilitar testes no chat do n8n\nconst debugBlock = [\n  \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\",\n  \"🛠️ [PAINEL DE TESTE SDR - BOTIER]\",\n  `• Produto de Foco: ${ctx.produto_foco}`,\n  `• Score: ${ctx.pontuacao} pts | Temperatura: ${ctx.temperatura}`,\n  `• Dados Completos: ${ctx.dados_completos ? '✅ SIM (Qualificado)' : '⏳ Em coleta'}`,\n  `• Acionar Especialista (Diego): ${ctx.acionar_especialista ? '🚨 SIM (Lead Quente)' : 'Não'}`,\n  `• Enviar Vídeo Geral: ${ctx.enviar_video ? '🎥 SIM' : 'Não'}`,\n  `• Novos dados nesta rodada: ${JSON.stringify(ctx.novos_dados || {})}`,\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\"\n].join('\\n');\n\nconst saidaChat = msgFormatada + debugBlock;\n\nreturn [{\n  json: {\n    output: saidaChat,\n    mensagem: msgFormatada,\n    dados_qualificacao: ctx.dados_qualificacao,\n    produto_foco: ctx.produto_foco,\n    pontuacao: ctx.pontuacao,\n    temperatura: ctx.temperatura,\n    dados_completos: ctx.dados_completos,\n    acionar_especialista: ctx.acionar_especialista,\n    enviar_video: ctx.enviar_video,\n    sessionId: ctx.sessionId\n  }\n}];"
+      },
+      "id": "saida-01",
+      "name": "Formatar Saída para Chat e Testes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-01",
+      "name": "Responder ao Teste Automatizado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1520,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Entrada Teste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Teste Automatizado": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Entrada Teste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Entrada Teste": {
+      "main": [
+        [
+          {
+            "node": "Preparar Contexto Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Contexto Lead": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Ana Botier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Ana Botier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent - Ana Botier",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_info_produto": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent - Ana Botier",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "tratar_objecao": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent - Ana Botier",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Ana Botier": {
+      "main": [
+        [
+          {
+            "node": "Parsear Resposta e Calcular Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear Resposta e Calcular Score": {
+      "main": [
+        [
+          {
+            "node": "Formatar Saída para Chat e Testes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Saída para Chat e Testes": {
+      "main": [
+        [
+          {
+            "node": "Responder ao Teste Automatizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
