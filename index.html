@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Botier • Validador &amp; Playground SDR Ana (QA)</title>
+  <meta name="description" content="Ambiente de teste, estresse e validação do atendimento SDR da Ana Botier (Serena 130T e Serena ECO)." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚜</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ================= TOPBAR ================= -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <!-- Botão para abrir gaveta de cenários no mobile -->
+      <button id="toggleScenariosMobileBtn" class="btn-icon-mobile" title="Abrir Cenários de Teste">
+        🧪 <span class="mobile-btn-text">Cenários</span>
+      </button>
+
+      <div class="topbar-brand">
+        <div class="brand-icon-wrap" title="Botier Ensiladeiras de Precisão">🚜</div>
+        <div class="brand-info">
+          <div class="brand-title-row">
+            <h1>Botier</h1>
+            <span class="brand-tag">SDR QA</span>
+          </div>
+          <p class="brand-subtitle">Ana WhatsApp • Serena 130T &amp; ECO</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status de Conexão com o n8n -->
+    <div class="topbar-center hide-mobile">
+      <div class="endpoint-pill" title="Webhook n8n ativo">
+        <span class="endpoint-status-dot online"></span>
+        <span class="endpoint-label">n8n Online</span>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="newChatTopBtn" class="btn-topbar" title="Iniciar nova conversa do zero">
+        🔄 <span class="hide-mobile">Nova Conversa</span>
+      </button>
+
+      <button id="openFeedbackDrawerBtn" class="btn-topbar btn-danger-pill" title="Ver todos os erros marcados">
+        📋 <span class="hide-mobile">Erros</span> <span id="feedbackBadgeCount" class="badge-count">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTAINER ================= -->
+  <main class="app-container">
+    
+    <!-- BACKDROP PARA CENÁRIOS NO MOBILE -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" style="display: none;"></div>
+
+    <!-- SIDEBAR: GUIA DE TESTES & CENÁRIOS (DESKTOP FIXO / MOBILE DRAWER) -->
+    <aside class="sidebar" id="sidebarContainer">
+      <div class="sidebar-header">
+        <div class="sidebar-header-title">
+          <h2>🧪 Cenários Práticos de Teste</h2>
+          <span class="sidebar-subtitle">Clique para simular e testar a Ana</span>
+        </div>
+        <button class="sidebar-close-mobile" id="closeSidebarMobileBtn" title="Fechar Cenários">✕</button>
+      </div>
+
+      <div class="sidebar-body">
+        
+        <!-- Cenários Rápidos -->
+        <div class="scenario-list">
+          
+          <button class="scenario-card" data-prompt="Olá, quanto custa a ensiladeira de vocês? Me passa o valor direto.">
+            <div class="scenario-top">
+              <span class="scenario-title">1. Teste da Regra de Ouro (Preço Direto)</span>
+              <span class="scenario-tag tag-stress">Armadilha</span>
+            </div>
+            <span class="scenario-preview">"Quanto custa a ensiladeira? Me passa o valor direto."</span>
+            <span class="scenario-expected">Esperado: Ancorar 4 benefícios ANTES de citar valor.</span>
+          </button>
+
+          <button class="scenario-card" data-prompt="Produzo leite e tenho um trator Massey Ferguson de 75 cavalos em Passos-MG. Quero ver a ensiladeira de vocês.">
+            <div class="scenario-top">
+              <span class="scenario-title">2. Perfil Ideal Serena ECO (75 cv)</span>
+              <span class="scenario-tag tag-eco">Serena ECO</span>
+            </div>
+            <span class="scenario-preview">"Tiro leite, trator de 75 cv em Passos-MG..."</span>
+            <span class="scenario-expected">Esperado: Indicar a ECO, qualificação enxuta e MG.</span>
+          </button>
+
+          <button class="scenario-card" data-prompt="Qual a diferença real entre a Serena 130T e a Serena ECO? As duas quebram grão?">
+            <div class="scenario-top">
+              <span class="scenario-title">3. Comparativo Técnico 130T vs ECO</span>
+              <span class="scenario-tag tag-tech">Técnico</span>
+            </div>
+            <span class="scenario-preview">"Qual a diferença real entre a 130T e a ECO?"</span>
+            <span class="scenario-expected">Esperado: Explicar cracker na 130T, sem cracker na ECO.</span>
+          </button>
+
+          <button class="scenario-card" data-prompt="Vi que a Serena 130T custa R$ 240.000... Achei muito caro, não tenho esse valor para investir na minha fazenda agora.">
+            <div class="scenario-top">
+              <span class="scenario-title">4. Objeção de Preço (Pivot para ECO)</span>
+              <span class="scenario-tag tag-pivot">Pivot</span>
+            </div>
+            <span class="scenario-preview">"Achei R$ 240.000 muito caro, não tenho esse valor..."</span>
+            <span class="scenario-expected">Esperado: Pivotar para Serena ECO e condições de lançamento.</span>
+          </button>
+
+          <button class="scenario-card" data-prompt="Ela colhe capim braquiária e mombaça também, ou é só milho?">
+            <div class="scenario-top">
+              <span class="scenario-title">5. Regra Exclusiva do Capim Capiaçu</span>
+              <span class="scenario-tag tag-capim">Agronômico</span>
+            </div>
+            <span class="scenario-preview">"Colhe capim braquiária e mombaça também?"</span>
+            <span class="scenario-expected">Esperado: Alertar que para capim é EXCLUSIVAMENTE Capiaçu.</span>
+          </button>
+
+          <button class="scenario-card" data-prompt="Meu trator é de 100 cv no motor. Aguenta rodar a Serena 130T com cracker em milho pesado?">
+            <div class="scenario-top">
+              <span class="scenario-title">6. Potência: Motor (cv) vs TDP (hp)</span>
+              <span class="scenario-tag tag-tech">Potência</span>
+            </div>
+            <span class="scenario-preview">"Trator de 100 cv no motor aguenta a 130T?"</span>
+            <span class="scenario-expected">Esperado: Diferenciar TDP (~85hp) do motor, avisar da margem.</span>
+          </button>
+
+          <button class="scenario-card" data-prompt="Pode passar meu contato pro Diego sim, tenho interesse em ver as condições do primeiro lote de lançamento da ECO!">
+            <div class="scenario-top">
+              <span class="scenario-title">7. Handoff &amp; Grupo de Lançamento</span>
+              <span class="scenario-tag tag-handoff">Handoff</span>
+            </div>
+            <span class="scenario-preview">"Pode passar meu contato pro Diego sim..."</span>
+            <span class="scenario-expected">Esperado: Acionar especialista e convite ao grupo de 30 vagas.</span>
+          </button>
+
+        </div>
+
+        <!-- Critérios de Ouro da Reunião -->
+        <div class="guardrails-box">
+          <strong>📋 Diretrizes da Reunião:</strong>
+          <ul>
+            <li><strong>Regra dos 4 Benefícios:</strong> Ancorar afiação de cabine, contrafaca externa, catraca e corte contínuo antes de falar preço.</li>
+            <li><strong>Serena ECO:</strong> Tratores de 75 cv, sem cracker, cardã/caixa, redução de custo.</li>
+            <li><strong>Qualificação ECO:</strong> Apenas leite/corte, cidade/estado (MG/SP) e momento de compra.</li>
+            <li><strong>Handoff:</strong> Direcionar para o Diego e convidar para o Grupo de Lançamento.</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ÁREA CENTRAL: SIMULADOR WHATSAPP -->
+    <section class="chat-window">
+      <!-- Cabeçalho do Chat -->
+      <div class="chat-header">
+        <div class="chat-contact">
+          <div class="chat-avatar">
+            <span class="avatar-icon">🚜</span>
+            <span class="online-indicator" title="Atendente Online"></span>
+          </div>
+          <div class="chat-contact-details">
+            <div class="chat-contact-name-row">
+              <h3>Ana • Botier</h3>
+              <span class="verified-badge" title="Conta Comercial Oficial">✔</span>
+            </div>
+            <span class="chat-contact-status" id="chatContactStatus">Online</span>
+          </div>
+        </div>
+
+        <!-- Telemetria no Header -->
+        <div class="header-telemetry">
+          <div class="telemetry-pill" id="pillProdutoFoco" title="Produto identificado">
+            <span class="telemetry-label">Foco:</span>
+            <span class="telemetry-val" id="valProdutoFoco">Serena ECO</span>
+          </div>
+          <div class="telemetry-pill hide-mobile-sm" id="pillScoreTemp" title="Score e Temperatura">
+            <span class="telemetry-val" id="valScoreTemp">0 pts • FRIO</span>
+          </div>
+          <div class="telemetry-pill hide-mobile" id="pillDiego" title="Status Especialista">
+            <span class="telemetry-label">Diego:</span>
+            <span class="telemetry-val" id="valDiego">Aguardando</span>
+          </div>
+        </div>
+
+        <div class="chat-actions">
+          <button class="btn-chat-icon" id="clearChatBtn" title="Limpar tela">🗑️</button>
+          <button class="btn-chat-icon" id="exportChatBtn" title="Salvar conversa">💾</button>
+        </div>
+      </div>
+
+      <!-- Histórico de Mensagens (Inicia 100% LIMPO) -->
+      <div class="chat-messages" id="chatMessages">
+        <!-- Estado Inicial Vazio e Limpo -->
+        <div class="chat-empty-state" id="chatEmptyState">
+          <div class="empty-state-icon">🚜</div>
+          <h3>Inicie uma conversa com a Ana</h3>
+          <p>Digite uma mensagem abaixo como produtor rural ou selecione um dos cenários de teste para começar.</p>
+        </div>
+
+        <!-- Indicador de Digitação -->
+        <div class="msg-row bot typing-row" id="typingIndicatorRow" style="display: none;">
+          <div class="msg-bubble typing-bubble">
+            <div class="msg-sender">Ana está digitando...</div>
+            <div class="typing-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Envio de Mensagem -->
+      <div class="chat-input-bar">
+        <div class="input-container">
+          <textarea
+            id="messageInput"
+            placeholder="Mensagem do produtor..."
+            rows="1"
+            maxlength="1000"
+          ></textarea>
+        </div>
+
+        <button id="sendBtn" class="btn-send" title="Enviar mensagem (Enter)">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Barra Inferior de Status -->
+      <div class="chat-footer-bar">
+        <div class="footer-meta-item">
+          <span>Sessão:</span>
+          <code id="sessionDisplay">iniciando...</code>
+        </div>
+        <div class="footer-meta-item">
+          <span>Latência:</span>
+          <span id="latencyDisplay" class="latency-val">—</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL: APONTAR ERRO ================= -->
+  <div class="modal-backdrop" id="feedbackModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <span class="modal-icon">🚩</span>
+          <h3>Apontar Falha na Resposta</h3>
+        </div>
+        <button class="modal-close" id="closeFeedbackModalBtn">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="quote-box" id="modalFlaggedQuote">"..."</div>
+
+        <!-- Nível de Gravidade -->
+        <div class="form-group">
+          <label>Nível de Gravidade:</label>
+          <div class="severity-selector">
+            <button type="button" class="severity-pill" data-severity="Baixa">
+              🟢 Baixa
+            </button>
+            <button type="button" class="severity-pill selected" data-severity="Média">
+              🟡 Média
+            </button>
+            <button type="button" class="severity-pill" data-severity="Crítica">
+              🔴 Crítica
+            </button>
+          </div>
+        </div>
+
+        <!-- Tipo de Falha -->
+        <div class="form-group">
+          <label>Tipo de Falha Encontrada:</label>
+          <div class="category-grid">
+            <button type="button" class="category-option selected" data-cat="Soltou preço seco sem os 4 benefícios">
+              💰 Preço seco sem 4 benefícios
+            </button>
+            <button type="button" class="category-option" data-cat="Ofereceu 130T para trator de 75cv em vez da ECO">
+              🚜 Ofereceu 130T p/ 75cv (não deu ECO)
+            </button>
+            <button type="button" class="category-option" data-cat="Pergunta em bloco ou qualificação repetida">
+              ❓ Pergunta repetida/bloco
+            </button>
+            <button type="button" class="category-option" data-cat="Erro técnico (TDP vs Motor / KPS / Facas)">
+              ⚙️ Erro técnico (TDP/Motor/KPS)
+            </button>
+            <button type="button" class="category-option" data-cat="Erro sobre culturas (Capiaçu exclusivo)">
+              🌿 Capim não exclusivo Capiaçu
+            </button>
+            <button type="button" class="category-option" data-cat="Não convidou para grupo de lançamento da ECO">
+              📢 Não convidou p/ grupo ECO
+            </button>
+            <button type="button" class="category-option" data-cat="Não acionou especialista Diego no momento certo">
+              🤝 Não acionou Diego no handoff
+            </button>
+            <button type="button" class="category-option" data-cat="Tom inadequado ou jargão interno de CRM">
+              🤖 Tom robótico / Jargão
+            </button>
+            <button type="button" class="category-option" data-cat="Outro motivo">
+              ✍️ Outro motivo
+            </button>
+          </div>
+        </div>
+
+        <!-- Comentário -->
+        <div class="form-group">
+          <label>Como a Ana deveria ter respondido?</label>
+          <textarea
+            id="feedbackCommentInput"
+            rows="2"
+            placeholder="Exemplo: Ela deveria ter falado dos benefícios de afiação antes de passar o preço..."
+          ></textarea>
+        </div>
+
+        <!-- Identificação -->
+        <div class="form-group">
+          <label>Seu Nome / Testador:</label>
+          <input type="text" id="feedbackTesterInput" placeholder="Ex: Pedro Paulo" value="Pedro Paulo" />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="cancelFeedbackBtn">Cancelar</button>
+        <button class="btn-modal-save" id="saveFeedbackBtn">Salvar Apontamento 💾</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DRAWER LATERAL: LISTA DE ERROS ================= -->
+  <div class="drawer-backdrop" id="feedbackDrawerBackdrop" style="display: none;"></div>
+  <aside class="feedback-drawer" id="feedbackDrawer">
+    <div class="drawer-header">
+      <div class="drawer-title-row">
+        <h3>📋 Erros Apontados</h3>
+        <span class="drawer-badge" id="drawerFeedbackCount">0</span>
+      </div>
+      <button class="drawer-close" id="closeFeedbackDrawerBtn">✕</button>
+    </div>
+
+    <div class="drawer-body" id="feedbackListContainer">
+      <div class="empty-feedbacks">Nenhum erro apontado ainda. Marque 🚩 nas respostas com falha!</div>
+    </div>
+
+    <div class="drawer-footer">
+      <div class="drawer-actions-row">
+        <button class="btn-drawer btn-export" id="exportJsonBtn">
+          📥 JSON
+        </button>
+        <button class="btn-drawer btn-export" id="exportCsvBtn">
+          📊 CSV
+        </button>
+      </div>
+      <button class="btn-drawer btn-danger" id="clearFeedbacksBtn">
+        🗑️ Limpar Todos
+      </button>
+    </div>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>
