@@ -221,6 +221,18 @@ body {
   background: #f43f5e;
 }
 
+.btn-pdf-link {
+  text-decoration: none;
+  background: #10b981;
+  border-color: #059669;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.btn-pdf-link:hover {
+  background: #059669;
+}
+
 .badge-count {
   background: rgba(0, 0, 0, 0.3);
   padding: 1px 6px;
