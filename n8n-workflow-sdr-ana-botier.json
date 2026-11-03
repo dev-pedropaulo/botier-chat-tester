@@ -34,7 +34,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.first().json;\n\n// Se veio pelo Chat Trigger nativo do n8n\nif (input.chatInput !== undefined) {\n  return [{\n    json: {\n      message: (input.chatInput || '').trim(),\n      phone: '5531999998888',\n      pushName: 'Carlos Teste',\n      origem_lead: 'anuncio_serena_eco', // Opções: 'anuncio_serena_eco', 'anuncio_serena_130t', 'inbound_organico'\n      produto_lead: 'Serena ECO',\n      sessionId: input.sessionId || 'sessao_chat_ui_01',\n      dados_iniciais: {}\n    }\n  }];\n}\n\n// Se veio pelo Webhook de teste automatizado (POST com JSON)\nconst body = input.body || input;\nreturn [{\n  json: {\n    message: (body.message || body.chatInput || '').trim(),\n    phone: body.phone || '5531999998888',\n    pushName: body.pushName || 'Carlos Teste',\n    origem_lead: body.origem_lead || body.origem || 'anuncio_serena_eco',\n    produto_lead: body.produto_lead || body.produto || 'Serena ECO',\n    sessionId: body.sessionId || body.phone || 'sessao_webhook_01',\n    dados_iniciais: body.dados_iniciais || {}\n  }\n}];"
+        "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\n// 1. Se for comando de salvar falha/feedback do Chat Tester na Data Table\nif (body.action === 'salvar_feedback' || input.action === 'salvar_feedback') {\n  const fb = body.feedback || input.feedback || body;\n  return [{\n    json: {\n      is_feedback: true,\n      id: fb.id || 'err_' + Date.now(),\n      data_hora: fb.data_hora || fb.formattedTime || new Date().toISOString(),\n      sessao: fb.sessao || fb.sessionId || '',\n      testador: fb.testador || fb.tester || 'Testador',\n      categoria: fb.categoria || fb.category || 'Outro',\n      gravidade: fb.gravidade || fb.severity || 'Média',\n      mensagem_usuario: fb.mensagem_usuario || fb.userPrompt || '',\n      resposta_ana: fb.resposta_ana || fb.botResponse || '',\n      comentario_correcao: fb.comentario_correcao || fb.comment || '',\n      score: fb.score || 0,\n      temperatura: fb.temperatura || 'INDEFINIDO',\n      produto_foco: fb.produto_foco || fb.produtoFoco || 'Indefinido'\n    }\n  }];\n}\n\n// 2. Se veio pelo Chat Trigger nativo do n8n\nif (input.chatInput !== undefined) {\n  return [{\n    json: {\n      is_feedback: false,\n      message: (input.chatInput || '').trim(),\n      phone: '5531999998888',\n      pushName: 'Carlos Teste',\n      origem_lead: 'anuncio_serena_eco', // Opções: 'anuncio_serena_eco', 'anuncio_serena_130t', 'inbound_organico'\n      produto_lead: 'Serena ECO',\n      sessionId: input.sessionId || 'sessao_chat_ui_01',\n      dados_iniciais: {}\n    }\n  }];\n}\n\n// 3. Se veio pelo Webhook de teste automatizado (POST com JSON)\nreturn [{\n  json: {\n    is_feedback: false,\n    message: (body.message || body.chatInput || '').trim(),\n    phone: body.phone || '5531999998888',\n    pushName: body.pushName || 'Carlos Teste',\n    origem_lead: body.origem_lead || body.origem || 'anuncio_serena_eco',\n    produto_lead: body.produto_lead || body.produto || 'Serena ECO',\n    sessionId: body.sessionId || body.phone || 'sessao_webhook_01',\n    dados_iniciais: body.dados_iniciais || {}\n  }\n}];"
       },
       "id": "norm-01",
       "name": "Normalizar Entrada Teste",
@@ -43,6 +43,121 @@
       "position": [
         0,
         300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-fb-01",
+              "leftValue": "={{ $json.is_feedback }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-feedback-01",
+      "name": "É Registro de Falha?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "tableId": {
+          "__rl": true,
+          "value": "botier_sdr_erros",
+          "mode": "list",
+          "cachedResultName": "Erros SDR Ana Botier"
+        },
+        "columnsUi": {
+          "columnValues": [
+            {
+              "column": "data_hora",
+              "value": "={{ $json.data_hora }}"
+            },
+            {
+              "column": "sessao",
+              "value": "={{ $json.sessao }}"
+            },
+            {
+              "column": "testador",
+              "value": "={{ $json.testador }}"
+            },
+            {
+              "column": "categoria",
+              "value": "={{ $json.categoria }}"
+            },
+            {
+              "column": "gravidade",
+              "value": "={{ $json.gravidade }}"
+            },
+            {
+              "column": "mensagem_usuario",
+              "value": "={{ $json.mensagem_usuario }}"
+            },
+            {
+              "column": "resposta_ana",
+              "value": "={{ $json.resposta_ana }}"
+            },
+            {
+              "column": "comentario_correcao",
+              "value": "={{ $json.comentario_correcao }}"
+            },
+            {
+              "column": "score",
+              "value": "={{ $json.score }}"
+            },
+            {
+              "column": "temperatura",
+              "value": "={{ $json.temperatura }}"
+            },
+            {
+              "column": "produto_foco",
+              "value": "={{ $json.produto_foco }}"
+            }
+          ]
+        }
+      },
+      "id": "data-table-01",
+      "name": "Salvar Falha na Data Table",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        440,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Falha salva com sucesso na Data Table do n8n!', id: $('Normalizar Entrada Teste').item.json.id } }}",
+        "options": {}
+      },
+      "id": "respond-feedback-01",
+      "name": "Responder Feedback Salvo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        140
       ]
     },
     {
@@ -215,7 +330,36 @@
       "main": [
         [
           {
+            "node": "É Registro de Falha?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Registro de Falha?": {
+      "main": [
+        [
+          {
+            "node": "Salvar Falha na Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Preparar Contexto Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar Falha na Data Table": {
+      "main": [
+        [
+          {
+            "node": "Responder Feedback Salvo",
             "type": "main",
             "index": 0
           }

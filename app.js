@@ -410,7 +410,66 @@ function handleSaveFeedback() {
   closeFeedbackModal();
   renderFeedbackList();
 
-  alert('✅ Falha registrada com sucesso!');
+  // Envio assíncrono para a nuvem (Data Table do n8n)
+  sendFeedbackToCloud(newFeedback);
+}
+
+async function sendFeedbackToCloud(fb) {
+  try {
+    const payload = {
+      action: 'salvar_feedback',
+      feedback: {
+        id: fb.id,
+        data_hora: fb.formattedTime,
+        sessao: fb.sessionId,
+        testador: fb.tester,
+        categoria: fb.category,
+        gravidade: fb.severity,
+        mensagem_usuario: fb.userPrompt,
+        resposta_ana: fb.botResponse,
+        comentario_correcao: fb.comment,
+        score: fb.telemetry?.score || 0,
+        temperatura: fb.telemetry?.temperatura || 'INDEFINIDO',
+        produto_foco: fb.telemetry?.produtoFoco || 'Indefinido'
+      }
+    };
+
+    const resp = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (resp.ok) {
+      fb.syncedToCloud = true;
+      saveFeedbacks();
+      renderFeedbackList();
+      showToast('☁️ Falha salva na Data Table em nuvem!');
+    } else {
+      console.warn('Erro ao salvar na nuvem (HTTP ' + resp.status + ')');
+      showToast('⚠️ Falha salva localmente (aguardando sync na nuvem)');
+    }
+  } catch (err) {
+    console.warn('Erro de rede ao salvar feedback na nuvem:', err);
+    showToast('⚠️ Salvo localmente no navegador');
+  }
+}
+
+function showToast(msg) {
+  let toast = document.getElementById('appToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'appToast';
+    toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #0f172a; color: #ffffff; padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; border-left: 4px solid #10b981; transition: opacity 0.3s ease;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  toast.style.opacity = '1';
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => { toast.style.display = 'none'; }, 300);
+  }, 3500);
 }
 
 function loadFeedbacks() {
@@ -454,6 +513,7 @@ function renderFeedbackList() {
       <div class="card-meta">
         <span>Por: ${escapeHtml(fb.tester || 'Testador')}</span>
         <span>${escapeHtml(fb.formattedTime)}</span>
+        ${fb.syncedToCloud ? '<span style="color: #10b981; font-weight: 700; font-size: 10px;">☁️ Data Table OK</span>' : '<span style="color: #94a3b8; font-size: 10px;">💾 Local</span>'}
       </div>
     </div>
   `).join('');
